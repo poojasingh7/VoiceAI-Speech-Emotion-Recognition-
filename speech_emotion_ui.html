@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Speech Emotion Recognition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{
+  --bg:#eef1f7;--panel:#ffffff;--line:#d8deea;--text:#101626;--muted:#5a6580;--track:#e3e8f2;
+  --accent:79,209,197;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1020;--panel:#121a30;--line:#222d4a;--text:#eef2ff;--muted:#93a0c4;--track:#1b2542}}
+:root[data-theme="dark"]{--bg:#0b1020;--panel:#121a30;--line:#222d4a;--text:#eef2ff;--muted:#93a0c4;--track:#1b2542}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;min-height:100vh;
+  background-image:radial-gradient(60rem 40rem at 30% 20%,rgba(var(--accent),.16),transparent 60%);transition:background-image .6s}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
+h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1.02;letter-spacing:-.03em;font-weight:800;margin:0 0 10px;max-width:14ch}
+.sub{color:var(--muted);max-width:56ch;margin:0 0 26px;font-size:1.05rem}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:28px;overflow:hidden;min-height:440px}
+canvas{display:block;width:100%;height:100%;position:absolute;inset:0}
+.readout{position:absolute;left:0;right:0;bottom:0;padding:22px 26px;text-align:center;pointer-events:none}
+.mood{font-size:clamp(2rem,6vw,3.2rem);font-weight:800;letter-spacing:-.03em;text-transform:capitalize;color:rgb(var(--accent));transition:color .4s}
+.conf{color:var(--muted);font-size:.95rem;min-height:1.4em}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:20px}
+.btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:480px){.btns{grid-template-columns:1fr}}
+button,.btn{font:inherit;font-weight:600;font-size:.95rem;padding:12px 10px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;text-align:center;transition:transform .15s,background .2s,border-color .2s}
+button:hover,.btn:hover{border-color:rgb(var(--accent))}
+button:active,.btn:active{transform:scale(.97)}
+button.on{background:rgb(var(--accent));border-color:rgb(var(--accent));color:#0b1020}
+button:focus-visible,.btn:focus-within{outline:3px solid rgb(var(--accent));outline-offset:2px}
+.btn input{position:absolute;opacity:0;width:0;height:0}
+.status{color:var(--muted);font-size:.92rem;min-height:2.6em}
+.row{display:grid;grid-template-columns:5.2rem 1fr 3rem;align-items:center;gap:10px;margin:10px 0}
+.row .n{text-transform:capitalize;font-weight:600}
+.track{height:12px;background:var(--track);border-radius:99px;overflow:hidden}
+.fill{height:100%;width:25%;border-radius:99px;transition:width .35s cubic-bezier(.2,.8,.2,1)}
+.row .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem}
+.row.top .n{color:var(--text)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat span{color:var(--muted);font-size:.82rem}
+.note{color:var(--muted);font-size:.86rem;margin:0;border-top:1px solid var(--line);padding-top:14px}
+@media(prefers-reduced-motion:reduce){.fill,.mood,body{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Hear the feeling in a voice</h1>
+  <p class="sub">Speak into your microphone, upload a clip, or play the demo voice. The orb and bars follow the emotion in the sound as it changes.</p>
+  <div class="grid">
+    <section class="stage" aria-label="Live voice visualization">
+      <canvas id="cv" aria-hidden="true"></canvas>
+      <div class="readout"><div class="mood" id="mood">Waiting</div><div class="conf" id="conf">Choose a sound source to begin</div></div>
+    </section>
+    <section class="panel">
+      <div class="btns">
+        <button id="bMic">Use microphone</button>
+        <label class="btn" style="position:relative">Upload audio<input id="file" type="file" accept="audio/*"></label>
+        <button id="bDemo">Play demo voice</button>
+      </div>
+      <div class="status" id="status" role="status" aria-live="polite">Nothing is playing yet.</div>
+      <div id="bars"></div>
+      <div class="stats">
+        <div class="stat"><b id="sE">0</b><span>Loudness</span></div>
+        <div class="stat"><b id="sP">0</b><span>Pitch (Hz)</span></div>
+        <div class="stat"><b id="sB">0</b><span>Brightness</span></div>
+      </div>
+      <p class="note">This page estimates emotion in your browser from loudness, pitch movement and brightness. It is a visual demo, not the trained MLPClassifier from your Python project. Train that model on RAVDESS for real accuracy.</p>
+    </section>
+  </div>
+</div>
+<script>
+(function(){
+var EM=[{k:'calm',c:[79,209,197]},{k:'happy',c:[255,176,46]},{k:'fearful',c:[167,139,250]},{k:'disgust',c:[139,195,74]}];
+var RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+var $=function(i){return document.getElementById(i)};
+var cv=$('cv'),g=cv.getContext('2d'),barsEl=$('bars');
+var ctx,an,mode='idle',stopFn=null,fd=new Uint8Array(1024),td=new Float32Array(2048);
+var probs=[.25,.25,.25,.25],pAvg=0,lastP=0,pv=0,av=0,lastR=0,es=0,fr=0,rot=0,col=[79,209,197],feat={e:0,b:0,p:0},curP=0;
+var rows=EM.map(function(m){
+  var r=document.createElement('div');r.className='row';
+  r.innerHTML='<span class="n">'+m.k+'</span><div class="track"><div class="fill" style="background:rgb('+m.c+')"></div></div><span class="v">25%</span>';
+  barsEl.appendChild(r);return {r:r,f:r.querySelector('.fill'),v:r.querySelector('.v')};
+});
+function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+function size(){var d=devicePixelRatio||1,r=cv.getBoundingClientRect();cv.width=r.width*d;cv.height=r.height*d}
+addEventListener('resize',size);size();
+
+function ensure(){
+  if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();an=ctx.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=.75}
+  if(ctx.state==='suspended')ctx.resume();
+}
+function setStatus(t){$('status').textContent=t}
+function setBtns(m){$('bMic').className=m==='mic'?'on':'';$('bMic').textContent=m==='mic'?'Stop microphone':'Use microphone';
+  $('bDemo').className=m==='demo'?'on':'';$('bDemo').textContent=m==='demo'?'Stop demo':'Play demo voice'}
+function stopAll(msg){
+  if(stopFn){try{stopFn()}catch(e){}stopFn=null}
+  mode='idle';setBtns('idle');setStatus(msg||'Nothing is playing yet.');
+  $('mood').textContent='Waiting';$('conf').textContent='Choose a sound source to begin';
+}
+
+$('bMic').onclick=function(){
+  if(mode==='mic')return stopAll();
+  stopAll();ensure();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){return setStatus('Microphone is not available here. Try Upload audio or Play demo voice.')}
+  navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}}).then(function(st){
+    var s=ctx.createMediaStreamSource(st);s.connect(an);mode='mic';setBtns('mic');setStatus('Listening. Speak with different emotions to see the change.');
+    stopFn=function(){st.getTracks().forEach(function(t){t.stop()});s.disconnect()};
+  }).catch(function(){setStatus('Microphone access was blocked. Allow it in your browser, or use Upload audio or Play demo voice.')});
+};
+
+$('file').onchange=function(e){
+  var f=e.target.files[0];if(!f)return;
+  stopAll();ensure();setStatus('Reading '+f.name+'…');
+  f.arrayBuffer().then(function(b){return ctx.decodeAudioData(b)}).then(function(buf){
+    var s=ctx.createBufferSource();s.buffer=buf;s.connect(an);an.connect(ctx.destination);
+    s.onended=function(){if(mode==='file')stopAll('Finished playing '+f.name+'.')};
+    s.start();mode='file';setBtns('file');setStatus('Playing '+f.name+'.');
+    stopFn=function(){s.onended=null;try{s.stop()}catch(e){}try{an.disconnect(ctx.destination)}catch(e){}};
+  }).catch(function(){setStatus('That file could not be decoded. Try a WAV or MP3 file.')});
+  e.target.value='';
+};
+
+var PRE=[
+ {k:'calm',f:130,lp:700,gn:.12,rate:2,ad:.01,pd:2},
+ {k:'happy',f:270,lp:3200,gn:.3,rate:5,ad:.05,pd:25},
+ {k:'fearful',f:320,lp:2200,gn:.18,rate:9,ad:.09,pd:30},
+ {k:'disgust',f:105,lp:900,gn:.22,rate:1.2,ad:.02,pd:6}
+];
+$('bDemo').onclick=function(){
+  if(mode==='demo')return stopAll();
+  stopAll();ensure();
+  var o=ctx.createOscillator(),fl=ctx.createBiquadFilter(),gn=ctx.createGain(),l=ctx.createOscillator(),la=ctx.createGain(),lp=ctx.createGain();
+  o.type='sawtooth';fl.type='lowpass';l.type='sine';
+  l.connect(la);la.connect(gn.gain);l.connect(lp);lp.connect(o.frequency);
+  o.connect(fl);fl.connect(gn);gn.connect(an);o.start();l.start();
+  var i=0;
+  function next(){var p=PRE[i%4];i++;var t=ctx.currentTime;
+    o.frequency.setTargetAtTime(p.f,t,.15);fl.frequency.setTargetAtTime(p.lp,t,.15);gn.gain.setTargetAtTime(p.gn,t,.15);
+    l.frequency.setTargetAtTime(p.rate,t,.15);la.gain.setTargetAtTime(p.ad,t,.15);lp.gain.setTargetAtTime(p.pd,t,.15);
+    setStatus('Demo voice is imitating a '+p.k+' tone. Watch the bars follow it.');}
+  next();var iv=setInterval(next,4500);
+  mode='demo';setBtns('demo');
+  stopFn=function(){clearInterval(iv);try{o.stop();l.stop()}catch(e){}gn.disconnect()};
+};
+
+function pitch(buf,sr){
+  var n=1024,c0=0,best=0,bl=0,min=Math.floor(sr/500),max=Math.floor(sr/70),i,lag,s;
+  for(i=0;i<n;i++)c0+=buf[i]*buf[i];
+  if(c0<1e-3)return 0;
+  for(lag=min;lag<=max;lag++){s=0;for(i=0;i<n;i++)s+=buf[i]*buf[i+lag];if(s>best){best=s;bl=lag}}
+  return best/c0>.4?sr/bl:0;
+}
+
+function analyse(){
+  an.getByteFrequencyData(fd);an.getFloatTimeDomainData(td);
+  var sr=ctx.sampleRate,i,sum=0;
+  for(i=0;i<2048;i++)sum+=td[i]*td[i];
+  var rms=Math.sqrt(sum/2048),e=clamp(rms*7,0,1);
+  var num=0,den=0;
+  for(i=1;i<512;i++){num+=i*fd[i];den+=fd[i]}
+  var hz=den?num/den*sr/2048:0,b=clamp((hz-300)/2500,0,1);
+  if(fr%3===0&&e>.03){
+    var p=pitch(td,sr);
+    if(p>0){if(lastP>0)pv=pv*.9+12*Math.abs(Math.log(p/lastP)/Math.LN2)*.1;lastP=p;pAvg=pAvg?pAvg*.85+p*.15:p}
+  }
+  av=av*.92+Math.abs(rms-lastR)*.08;lastR=rms;
+  es+=(e-es)*.2;feat={e:e,b:b,p:pAvg};
+  var v=clamp(pv/3+av*40,0,1),pn=clamp((pAvg-90)/260,0,1);
+  var L=[2*(1-e)+1.5*(1-v)+(1-b), 2*e+1.5*b+1.2*pn+.4*v, 2.2*v+1.2*pn+.5*(1-e), 1.5*(1-pn)+1.2*(1-b)+.8*e];
+  var ex=L.map(function(x){return Math.exp(x/.4)}),t=ex.reduce(function(a,c){return a+c},0);
+  var target=ex.map(function(x){return x/t});
+  var k=e<.03?.03:.08;
+  if(e<.03){target=[.25,.25,.25,.25]}
+  for(i=0;i<4;i++)probs[i]+=(target[i]-probs[i])*k;
+}
+
+function updateUI(){
+  var top=0,i;for(i=1;i<4;i++)if(probs[i]>probs[top])top=i;
+  var tc=[0,0,0];
+  for(i=0;i<4;i++){for(var j=0;j<3;j++)tc[j]+=EM[i].c[j]*probs[i];
+    rows[i].f.style.width=(probs[i]*100).toFixed(0)+'%';rows[i].v.textContent=(probs[i]*100).toFixed(0)+'%';
+    rows[i].r.className='row'+(i===top&&mode!=='idle'?' top':'')}
+  col=tc.map(Math.round);
+  document.documentElement.style.setProperty('--accent',col.join(','));
+  if(mode!=='idle'){
+    if(feat.e<.03){$('mood').textContent='Listening';$('conf').textContent='Waiting for sound'}
+    else{$('mood').textContent=EM[top].k;$('conf').textContent=(probs[top]*100).toFixed(0)+'% match'}
+  }
+  $('sE').textContent=(feat.e*100).toFixed(0);$('sP').textContent=feat.p?feat.p.toFixed(0):'0';$('sB').textContent=(feat.b*100).toFixed(0);
+}
+
+function draw(t){
+  var W=cv.width,H=cv.height,cx=W/2,cy=H*.42,d=devicePixelRatio||1,R=Math.min(W,H*.9)*.2,N=120,i,c=col.join(',');
+  g.clearRect(0,0,W,H);
+  var idle=mode==='idle',breath=RM?0:Math.sin(t*.0015);
+  var rr=R*(1+(idle?breath*.04:es*.28));
+  // core glow
+  var gr=g.createRadialGradient(cx,cy,0,cx,cy,rr*1.7);
+  gr.addColorStop(0,'rgba('+c+','+(idle?.22:.28+es*.3)+')');gr.addColorStop(1,'rgba('+c+',0)');
+  g.fillStyle=gr;g.beginPath();g.arc(cx,cy,rr*1.7,0,6.2832);g.fill();
+  // frequency spikes
+  g.lineCap='round';g.lineWidth=3.2*d;
+  for(i=0;i<N;i++){
+    var m=Math.min(i,N-1-i),v;
+    if(idle)v=.1+.07*Math.sin(m*.35+t*.0012)+.05*Math.sin(m*.11-t*.0007);
+    else v=fd[2+Math.floor(Math.pow(m/(N/2),1.5)*420)]/255;
+    var a=i/N*6.2832+rot,len=(5*d+v*R*1.05),x0=cx+Math.cos(a)*rr*1.12,y0=cy+Math.sin(a)*rr*1.12;
+    g.strokeStyle='rgba('+c+','+(.3+v*.7)+')';
+    g.beginPath();g.moveTo(x0,y0);g.lineTo(cx+Math.cos(a)*(rr*1.12+len),cy+Math.sin(a)*(rr*1.12+len));g.stroke();
+  }
+  // waveform ring
+  g.lineWidth=2.2*d;g.strokeStyle='rgba('+c+',.95)';g.beginPath();
+  for(i=0;i<=180;i++){
+    var w=idle?Math.sin(i*.35+t*.003)*.05:td[(i%180)*8]*1.8,a2=i/180*6.2832-rot*.6,r2=rr*.82+w*R*.55;
+    var px=cx+Math.cos(a2)*r2,py=cy+Math.sin(a2)*r2;i?g.lineTo(px,py):g.moveTo(px,py);
+  }
+  g.closePath();g.stroke();
+  // core
+  g.fillStyle='rgba('+c+',.16)';g.beginPath();g.arc(cx,cy,rr*.5*(1+es*.2),0,6.2832);g.fill();
+}
+
+function frame(t){
+  if(mode!=='idle')analyse();else{es*=.9;for(var i=0;i<4;i++)probs[i]+=(.25-probs[i])*.05}
+  if(fr%3===0)updateUI();
+  if(!RM)rot+=.002+es*.01;
+  draw(t);fr++;requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
