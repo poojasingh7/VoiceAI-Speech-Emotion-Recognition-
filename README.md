@@ -509,21 +509,32 @@ accuracy or performance figures without supporting evaluation results.
 
 ## 🖼️ Screenshots
 
-Add screenshots of your actual application to a `screenshots/` directory
-in the repository.
 
-Suggested images:
+---
 
-| Screenshot | What to show |
-|---|---|
-| `dashboard.png` | Main dashboard |
-| `live-recording.png` | Microphone recording interface |
-| `emotion-result.png` | Emotion prediction and confidence |
-| `analytics.png` | Acoustic features and visualizations |
-| `database.png` | Sanitized database schema or sample results |
+## 🖥️ Application Screenshots
 
-After uploading the images, add them to this section using paths that
-match your actual filenames.
+### 🏠 Dashboard
+![VoiceAI Dashboard](dashboard.png)
+
+### 🎭 Emotion Analysis
+![Emotion Analysis](emotion-analysis.png)
+
+### 🎤 Audio Recording
+![Audio Recording](audio-recording.png)
+
+### 📊 Analytics
+![Voice Analytics](analytics.png)
+
+### 📝 Speech Transcription
+![Speech Transcription](transcription.png)
+
+### 🤖 Model Results
+![Model Results](model-results.png)
+
+### 💻 Application Interface
+![VoiceAI Interface](application-ui.png)
+
 
 Example:
 
